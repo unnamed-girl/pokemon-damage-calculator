@@ -1,0 +1,1 @@
+Data taken from https://github.com/smogon/pokemon-showdown/tree/master/data and  https://github.com/pkmn/ps/tree/main/dex/data, both of which are distributed under the MIT licence.
