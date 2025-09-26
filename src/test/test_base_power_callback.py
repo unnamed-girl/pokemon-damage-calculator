@@ -1,35 +1,58 @@
-from pokemon_damage_calculator.calc.calcbuilder import CalcBuilder
+from pokemon_damage_calculator.calc.calcbuilder import Format
 from pokemon_damage_calculator.calc.pokemon import PokemonBuilder
+from test.testutils import standard_calc
 
 
 def test_low_kick():
-    assert CalcBuilder.gen9vgc().calc(
-        PokemonBuilder("swampert").build(),
-        PokemonBuilder("swampert").build(),
-        "lowkick",
-    ) == [36, 36, 37, 37, 38, 38, 39, 39, 39, 40, 40, 41, 41, 42, 42, 43]
+    assert standard_calc(
+        format=Format.gen9vgc(),
+        attacker=PokemonBuilder("swampert").build(),
+        defender=PokemonBuilder("swampert").build(),
+        move="lowkick",
+    ) == [
+        36,
+        36,
+        37,
+        37,
+        38,
+        38,
+        39,
+        39,
+        39,
+        40,
+        40,
+        41,
+        41,
+        42,
+        42,
+        43,
+    ]
 
-    assert CalcBuilder.gen9vgc().calc(
-        PokemonBuilder("cosmoem").build(),
-        PokemonBuilder("cosmoem").build(),
+    assert standard_calc(
+        Format.gen9vgc(),
+        PokemonBuilder("cosmoem"),
+        PokemonBuilder("cosmoem"),
         "lowkick",
     ) == [8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 9, 9, 9, 9, 9, 9]
 
-    assert CalcBuilder.gen9vgc().calc(
-        PokemonBuilder("tyrogue").build(),
-        PokemonBuilder("tyrogue").build(),
+    assert standard_calc(
+        Format.gen9vgc(),
+        PokemonBuilder("tyrogue"),
+        PokemonBuilder("tyrogue"),
         "lowkick",
     ) == [24, 24, 24, 24, 24, 25, 25, 25, 25, 25, 27, 27, 27, 27, 27, 28]
 
 
 def test_electro_ball():
-    assert CalcBuilder.gen9vgc().calc(
+    assert standard_calc(
+        Format.gen9vgc(),
         PokemonBuilder("electrode").build(),
         PokemonBuilder("tyrogue").build(),
         "electroball",
     ) == [84, 84, 85, 87, 87, 88, 90, 90, 91, 93, 93, 94, 96, 96, 97, 99]
 
-    assert CalcBuilder.gen9vgc().calc(
+    assert standard_calc(
+        Format.gen9vgc(),
         PokemonBuilder("cosmoem").build(),
         PokemonBuilder("electrode").build(),
         "electroball",
@@ -37,13 +60,15 @@ def test_electro_ball():
 
 
 def test_heavy_slam():
-    assert CalcBuilder.gen9vgc().calc(
+    assert standard_calc(
+        Format.gen9vgc(),
         PokemonBuilder("electrode").build(),
         PokemonBuilder("tyrogue").build(),
         "heavyslam",
     ) == [39, 39, 40, 40, 40, 41, 41, 42, 42, 43, 43, 44, 44, 45, 45, 46]
 
-    assert CalcBuilder.gen9vgc().calc(
+    assert standard_calc(
+        Format.gen9vgc(),
         PokemonBuilder("cosmoem").build(),
         PokemonBuilder("electrode").build(),
         "heavyslam",
@@ -51,13 +76,15 @@ def test_heavy_slam():
 
 
 def test_heat_crash():
-    assert CalcBuilder.gen9vgc().calc(
+    assert standard_calc(
+        Format.gen9vgc(),
         PokemonBuilder("electrode").build(),
         PokemonBuilder("tyrogue").build(),
         "heatcrash",
     ) == [39, 39, 40, 40, 40, 41, 41, 42, 42, 43, 43, 44, 44, 45, 45, 46]
 
-    assert CalcBuilder.gen9vgc().calc(
+    assert standard_calc(
+        Format.gen9vgc(),
         PokemonBuilder("cosmoem").build(),
         PokemonBuilder("electrode").build(),
         "heatcrash",

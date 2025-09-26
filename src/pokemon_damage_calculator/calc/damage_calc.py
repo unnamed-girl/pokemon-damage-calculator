@@ -21,6 +21,12 @@ from pokemon_damage_calculator.model.models import Move
 from .pokemon import Pokemon
 from ..utils import TYPE_CHART
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .calcbuilder import Format, Field
+
+
 logger = logging.getLogger()
 
 
@@ -39,7 +45,9 @@ def pokerounded_multiply(damage_range: list[int], multiplier: float) -> list[int
     return [pokemon_round(d * multiplier) for d in damage_range]
 
 
-def damage_calc(move: Move, attacker: "Pokemon", target: "Pokemon") -> list[int]:
+def damage_calc(
+    format: "Format", field: "Field", attacker: Pokemon, target: Pokemon, move: Move
+) -> list[int]:
     if move.category == MoveCategory.Status:
         return [0]
 
@@ -93,7 +101,6 @@ def damage_calc(move: Move, attacker: "Pokemon", target: "Pokemon") -> list[int]
     defence = target.stat(defense_stat)
     level = attacker.level
     power = move.basePower
-
     other_modifications = 1
 
     ###  Attacker Abilities
@@ -129,6 +136,16 @@ def damage_calc(move: Move, attacker: "Pokemon", target: "Pokemon") -> list[int]
             ]:
                 other_modifications *= 1.2
                 altered_move_type = PokemonType.Normal
+
+    type_multiplier = 1
+    for poke_type in target.species.types:
+        multiplier = TYPE_CHART[poke_type].get(altered_move_type, TypeMatchup.Neutral)
+        if not (
+            poke_type == PokemonType.Flying
+            and target.has_ability(Ability.DeltaStream)
+            and multiplier == TypeMatchup.SuperEffective
+        ):
+            type_multiplier *= multiplier
     ## Stat Modification
     # TODO Blaze
     # TODO Overgrow
@@ -229,7 +246,7 @@ def damage_calc(move: Move, attacker: "Pokemon", target: "Pokemon") -> list[int]
         ]
         for ability, flag in flag_immunities:
             if move.has_flag(flag) and target.has_ability(ability):
-                return [0]
+                other_modifications = 0
         type_immunities = [
             (Ability.EarthEater, PokemonType.Ground),
             (Ability.FlashFire, PokemonType.Fire),
@@ -245,7 +262,7 @@ def damage_calc(move: Move, attacker: "Pokemon", target: "Pokemon") -> list[int]
         ]
         for ability, type_ in type_immunities:
             if altered_move_type == type_ and target.has_ability(ability):
-                return [0]
+                type_multiplier = 0
 
         # TODO Disguise
         if altered_move_type == PokemonType.Fire and target.has_ability(
@@ -282,6 +299,9 @@ def damage_calc(move: Move, attacker: "Pokemon", target: "Pokemon") -> list[int]
         ):
             other_modifications *= 0.5
 
+        if target.has_ability(Ability.WonderGuard) and not type_multiplier > 1.0:
+            type_multiplier = 0
+
     # Unique mods
     if move.basePowerCallback:
         if move.name in ["Heavy Slam", "Heat Crash"]:
@@ -293,18 +313,6 @@ def damage_calc(move: Move, attacker: "Pokemon", target: "Pokemon") -> list[int]
         else:
             logger.error("Didn't handle base power callback for %s", move.name)
     for type_, ability, multiplier in [
-        (PokemonType.Grass, Ability.GrassySurge, 1.3),
-        (PokemonType.Electric, Ability.ElectricSurge, 1.3),
-        (PokemonType.Psychic, Ability.PsychicSurge, 1.3),
-        (PokemonType.Fire, Ability.DesolateLand, 1.5),
-        (PokemonType.Water, Ability.DesolateLand, 0),
-        (PokemonType.Fire, Ability.Drought, 1.5),
-        (PokemonType.Water, Ability.Drought, 0.5),
-        (PokemonType.Fire, Ability.OrichalcumPulse, 1.5),
-        (PokemonType.Electric, Ability.HadronEngine, 1.3),
-        (PokemonType.Water, Ability.Drizzle, 1.5),
-        (PokemonType.Water, Ability.PrimordialSea, 1.5),
-        (PokemonType.Fire, Ability.PrimordialSea, 0),
         (PokemonType.Fairy, Ability.FairyAura, 1.33),
         (PokemonType.Dark, Ability.DarkAura, 1.33),
     ]:
@@ -312,6 +320,14 @@ def damage_calc(move: Move, attacker: "Pokemon", target: "Pokemon") -> list[int]
             attacker.has_ability(ability) or target.has_ability(ability)
         ):
             other_modifications *= multiplier
+
+    if field.terrain:
+        other_modifications *= field.terrain.type_multiplier(altered_move_type)
+    if field.weather:
+        weather = field.weather.type_multiplier(altered_move_type)
+    else:
+        weather = 1
+
     if attacker.has_ability(Ability.DauntlessShield) and move.name == "Body Press":
         attack *= 1.5
     if offense_stat == Stat.Attack and attacker.has_ability(Ability.IntrepidSword):
@@ -348,16 +364,6 @@ def damage_calc(move: Move, attacker: "Pokemon", target: "Pokemon") -> list[int]
     # TODO Solid Rock
     # TODO Wonder GUard
 
-    type_multiplier = 1
-    for poke_type in target.species.types:
-        multiplier = TYPE_CHART[poke_type].get(altered_move_type, TypeMatchup.Neutral)
-        if not (
-            poke_type == PokemonType.Flying
-            and target.has_ability(Ability.DeltaStream)
-            and multiplier == TypeMatchup.SuperEffective
-        ):
-            type_multiplier *= multiplier
-
     logger.info(
         "Level %s, power %s, attack %s, defence %s", level, power, attack, defence
     )
@@ -374,7 +380,7 @@ def damage_calc(move: Move, attacker: "Pokemon", target: "Pokemon") -> list[int]
         if parental_bond:
             damage = pokemon_round(damage * 0.25)
             logger.info("Parental bond second hit: %s", damage)
-        # Weather
+        damage = pokemon_round(damage * weather)
         # Glaive Rush
         if move.willCrit:
             damage = math.floor(damage * 1.5)

@@ -1,12 +1,13 @@
-from pokemon_damage_calculator.calc.calcbuilder import CalcBuilder
+from pokemon_damage_calculator.calc.calcbuilder import Format
 from pokemon_damage_calculator.model.enums import Stat
 from pokemon_damage_calculator.calc.pokemon import PokemonBuilder
 from pokemon_damage_calculator.model.natures import Nature
-from test.testutils import flareon
+from test.testutils import flareon, standard_calc
 
 
 def test_damage_calc_evs():
-    damage = CalcBuilder.gen9vgc().calc(
+    damage = standard_calc(
+        Format.gen9vgc(),
         (
             PokemonBuilder("rillaboom")
             .ev(Stat.Attack, 184)
@@ -39,7 +40,8 @@ def test_damage_calc_evs():
 
 def test_damage_calc_resist():
     swampert = PokemonBuilder("swampert").build()
-    damage = CalcBuilder.gen9vgc().calc(
+    damage = standard_calc(
+        Format.gen9vgc(),
         swampert,
         swampert,
         "hydropump",
@@ -49,7 +51,8 @@ def test_damage_calc_resist():
 
 
 def test_auto_crit():
-    assert CalcBuilder.gen9vgc().calc(
+    assert standard_calc(
+        Format.gen9vgc(),
         (PokemonBuilder("urshifurapidstrike").build()),
         flareon(),
         "surgingstrikes",
@@ -72,7 +75,8 @@ def test_auto_crit():
         240,
     ]
 
-    assert CalcBuilder.gen9vgc().calc(
+    assert standard_calc(
+        Format.gen9vgc(),
         (PokemonBuilder("swampert").ev(Stat.Attack, 252).build()),
         flareon(),
         "wickedblow",

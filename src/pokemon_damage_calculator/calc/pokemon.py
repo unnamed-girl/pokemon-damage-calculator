@@ -1,8 +1,9 @@
 import logging
 import math
+from typing import Optional
 
 from pokemon_damage_calculator.data import get_nature, get_species
-from pokemon_damage_calculator.model.enums import Ability, Stat
+from pokemon_damage_calculator.model.enums import Ability, Stat, Status
 from pokemon_damage_calculator.model.models import Species
 from pokemon_damage_calculator.model.natures import Nature, NatureModel
 from ..model.models import StatDistribution
@@ -26,6 +27,7 @@ class Pokemon:
         self.ability = ability
         self.ivs = ivs
         self.level = level
+        self.status: Optional[Status] = None
 
     def stat(self, stat: Stat) -> int:
         if self.nature.plus == stat:
@@ -40,8 +42,21 @@ class Pokemon:
         iv = self.ivs[stat]
         level = self.level
 
+        if stat != Stat.HP:
+            result = math.floor(
+                (math.floor((2 * base + iv + math.floor(ev / 4)) * level / 100) + 5)
+                * nature
+            )
+        else:
+            result = (
+                math.floor((2 * base + iv + math.floor(ev / 4)) * level / 100)
+                + level
+                + 10
+            )
         logger.info(
-            "Stat %s, nature %s, base %s, ev %s, iv %s, level %s",
+            "Result %s, Species %s, Stat %s, nature %s, base %s, ev %s, iv %s, level %s",
+            result,
+            self.species.name,
             stat,
             nature,
             base,
@@ -49,18 +64,7 @@ class Pokemon:
             iv,
             level,
         )
-
-        if stat != Stat.HP:
-            return math.floor(
-                (math.floor((2 * base + iv + math.floor(ev / 4)) * level / 100) + 5)
-                * nature
-            )
-        else:
-            return (
-                math.floor((2 * base + iv + math.floor(ev / 4)) * level / 100)
-                + level
-                + 10
-            )
+        return result
 
     def has_ability(self, ability: Ability) -> bool:
         return self.ability == ability

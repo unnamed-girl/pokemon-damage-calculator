@@ -1,8 +1,8 @@
-from pokemon_damage_calculator.calc.calcbuilder import CalcBuilder
+from pokemon_damage_calculator.calc.calcbuilder import Format
 from pokemon_damage_calculator.calc.pokemon import PokemonBuilder
 from pokemon_damage_calculator.model.enums import Ability, Stat
 from pokemon_damage_calculator.model.natures import Nature
-from test.testutils import flareon
+from test.testutils import flareon, standard_calc
 
 
 # def test_parental_bond_boost():
@@ -47,7 +47,8 @@ def test_parental_bond_damage():
     total = [first_hit[i] + second_hit[i] for i in range(len(first_hit))]
 
     assert (
-        CalcBuilder.gen9vgc().calc(
+        standard_calc(
+            Format.gen9vgc(),
             (
                 PokemonBuilder("kangaskhanmega")
                 .ev(Stat.Attack, 252)
@@ -61,3 +62,13 @@ def test_parental_bond_damage():
         )
         == total
     )
+
+
+def test_wonderguard():
+    # Wonderguard standalone
+    assert standard_calc(
+        Format.gen9vgc(),
+        (PokemonBuilder("gyarados")),
+        (PokemonBuilder("shedinja").ability(Ability.WonderGuard)),
+        "waterfall",
+    ) == [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]

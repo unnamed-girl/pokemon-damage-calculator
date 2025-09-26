@@ -1,5 +1,10 @@
 from enum import Enum
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    pass
+
 
 class BoostableStat(Enum):
     HP = "hp"
@@ -523,11 +528,40 @@ class UniqueSelfSwitch(Enum):
 
 
 class Weather(Enum):
+    NONE = None
     Sandstorm = "Sandstorm"
     SunnyDay = "sunnyday"
     RainDance = "RainDance"
     Snow = "snow"
     Hail = "hail"
+    ExtremelyHarshSunlight = "extremelyharshsunlight"
+    HeavyRain = "heavyrain"
+    StrongWinds = "strongwinds"
+
+    def difficult_to_override(self) -> bool:
+        return self in [
+            Weather.ExtremelyHarshSunlight,
+            Weather.HeavyRain,
+            Weather.StrongWinds,
+        ]
+
+    def type_multiplier(self, type_: PokemonType) -> float:
+        match self:
+            case Weather.SunnyDay | Weather.ExtremelyHarshSunlight if (
+                type_ == PokemonType.Fire
+            ):
+                return 1.5
+            case Weather.ExtremelyHarshSunlight if type_ == PokemonType.Water:
+                return 0.0
+            case Weather.SunnyDay if type_ == PokemonType.Water:
+                return 0.5
+            case Weather.RainDance if type_ == PokemonType.Fire:
+                return 0.5
+            case Weather.HeavyRain if type_ == PokemonType.Fire:
+                return 0.0
+            case Weather.RainDance | Weather.HeavyRain if type_ == PokemonType.Water:
+                return 1.5
+        return 1.0
 
 
 class NonGhostTarget(Enum):
@@ -547,10 +581,21 @@ class UniqueDamage(Enum):
 
 
 class Terrain(Enum):
+    NONE = None
     Misty = "mistyterrain"
     Psychic = "psychicterrain"
     Grassy = "grassyterrain"
     Electric = "electricterrain"
+
+    def type_multiplier(self, type_: PokemonType) -> float:
+        match self:
+            case Terrain.Psychic if type_ == PokemonType.Psychic:
+                return 1.3
+            case Terrain.Electric if type_ == PokemonType.Electric:
+                return 1.3
+            case Terrain.Grassy if type_ == PokemonType.Grass:
+                return 1.3
+        return 1.0
 
 
 class MoveSelfDestructs(Enum):
