@@ -21,6 +21,7 @@ def test_low_kick():
         "lowkick",
     ) == [24, 24, 24, 24, 24, 25, 25, 25, 25, 25, 27, 27, 27, 27, 27, 28]
 
+
 def test_electro_ball():
     assert CalcBuilder.gen9vgc().calc(
         PokemonBuilder("electrode").build(),
@@ -34,6 +35,7 @@ def test_electro_ball():
         "electroball",
     ) == [4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 5]
 
+
 def test_heavy_slam():
     assert CalcBuilder.gen9vgc().calc(
         PokemonBuilder("electrode").build(),
@@ -46,6 +48,7 @@ def test_heavy_slam():
         PokemonBuilder("electrode").build(),
         "heavyslam",
     ) == [12, 12, 13, 13, 13, 13, 13, 13, 13, 14, 14, 14, 14, 14, 14, 15]
+
 
 def test_heat_crash():
     assert CalcBuilder.gen9vgc().calc(

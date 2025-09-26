@@ -10,6 +10,7 @@ class NatureModel:
     plus: Stat | None
     minus: Stat | None
 
+
 class Nature(str, Enum):
     HARDY = "Hardy"
     LONELY = "Lonely"

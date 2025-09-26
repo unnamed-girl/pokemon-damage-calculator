@@ -1,4 +1,3 @@
-
 from pokemon_damage_calculator.calc.damage_calc import damage_calc
 from pokemon_damage_calculator.calc.pokemon import Pokemon
 from pokemon_damage_calculator.data import get_move

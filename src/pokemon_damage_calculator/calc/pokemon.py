@@ -35,27 +35,29 @@ class Pokemon:
         else:
             nature = 1.0
 
-        logger.info(
-            "%s's %s nature is %s for %s", self.species.name, self.nature, nature, stat
-        )
-        logger.info("Ivs: %s and evs %s", self.ivs, self.evs)
-
-        base_stat = self.species.baseStats[stat]
+        base = self.species.baseStats[stat]
         ev = self.evs[stat]
         iv = self.ivs[stat]
         level = self.level
 
+        logger.info(
+            "Stat %s, nature %s, base %s, ev %s, iv %s, level %s",
+            stat,
+            nature,
+            base,
+            ev,
+            iv,
+            level,
+        )
+
         if stat != Stat.HP:
             return math.floor(
-                (
-                    math.floor((2 * base_stat + iv + math.floor(ev / 4)) * level / 100)
-                    + 5
-                )
+                (math.floor((2 * base + iv + math.floor(ev / 4)) * level / 100) + 5)
                 * nature
             )
         else:
             return (
-                math.floor((2 * base_stat + iv + math.floor(ev / 4)) * level / 100)
+                math.floor((2 * base + iv + math.floor(ev / 4)) * level / 100)
                 + level
                 + 10
             )
@@ -81,6 +83,10 @@ class PokemonBuilder:
 
     def ev(self, stat: Stat, ev: int) -> "PokemonBuilder":
         self._evs[stat] = ev
+        return self
+
+    def ability(self, ability: Ability) -> "PokemonBuilder":
+        self._ability = ability
         return self
 
     def iv(self, stat: Stat, iv: int) -> "PokemonBuilder":

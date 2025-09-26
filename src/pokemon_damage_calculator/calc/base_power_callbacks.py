@@ -13,6 +13,7 @@ def low_kick(weight: float) -> int:
         power = 20
     return power
 
+
 def electro_ball(attacker_speed: int, target_speed: int) -> int:
     relative_speed = target_speed / attacker_speed
     if relative_speed > 0.5:

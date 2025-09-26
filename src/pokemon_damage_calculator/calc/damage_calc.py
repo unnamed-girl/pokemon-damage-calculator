@@ -1,7 +1,11 @@
 import logging
 import math
 
-from pokemon_damage_calculator.calc.base_power_callbacks import electro_ball, heavy_slam, low_kick
+from pokemon_damage_calculator.calc.base_power_callbacks import (
+    electro_ball,
+    heavy_slam,
+    low_kick,
+)
 from pokemon_damage_calculator.model.enums import (
     Ability,
     MoveCategory,
@@ -320,10 +324,6 @@ def damage_calc(move: Move, attacker: "Pokemon", target: "Pokemon") -> list[int]
         attack *= 1.33
     if offense_stat == Stat.Attack and attacker.has_ability(Ability.OrichalcumPulse):
         attack *= 1.33
-    if attacker.has_ability(Ability.ParentalBond) and not move.has_flag(
-        MoveFlag.NoParentalBond
-    ):
-        other_modifications *= 1.25
 
     match move.multihit:
         case n if type(n) is int:
@@ -362,32 +362,45 @@ def damage_calc(move: Move, attacker: "Pokemon", target: "Pokemon") -> list[int]
         "Level %s, power %s, attack %s, defence %s", level, power, attack, defence
     )
 
-    damage = math.floor(
-        math.floor(math.floor(level * 2.0 / 5.0 + 2.0) * power * attack / defence)
-        / 50.0
-        + 2.0
-    )  # From showdown, diverges from bulbapedia
-    logger.info("Base damage: %s", damage)
+    def final_formula(parental_bond=False):
+        damage = math.floor(
+            math.floor(math.floor(level * 2.0 / 5.0 + 2.0) * power * attack / defence)
+            / 50.0
+            + 2.0
+        )  # From showdown, diverges from bulbapedia
+        logger.info("Base damage: %s", damage)
 
-    damage = pokemon_round(damage * target_multiplier)
-    # Parental Bond
-    # Weather
-    # Glaive Rush
-    if move.willCrit:
-        damage = math.floor(damage * 1.5)
-        logger.info("Crit: %s", damage)
-    random = range(85, 101)
-    damage = [math.floor(damage * r / 100) for r in random]
-    logger.info("Range: %s", damage)
-    damage = floored_multiply(damage, stab)  # From showdown, diverges from bulbapedia
-    logger.info("Stab: %s", damage)
-    damage = floored_multiply(damage, type_multiplier)
-    logger.info("Type matchup: %s", damage)
-    # BURN
-    damage = pokerounded_multiply(damage, other_modifications)
-    logger.info("Other: %s", damage)
-    # ZMOVE
-    # TERA SHIELD
-    damage = pokerounded_multiply(damage, nhits)
-    logger.info("Nhits: %s", damage)
+        damage = pokemon_round(damage * target_multiplier)
+        if parental_bond:
+            damage = pokemon_round(damage * 0.25)
+            logger.info("Parental bond second hit: %s", damage)
+        # Weather
+        # Glaive Rush
+        if move.willCrit:
+            damage = math.floor(damage * 1.5)
+            logger.info("Crit: %s", damage)
+        random = range(85, 101)
+        damage = [math.floor(damage * r / 100) for r in random]
+        logger.info("Range: %s", damage)
+        damage = floored_multiply(
+            damage, stab
+        )  # From showdown, diverges from bulbapedia
+        logger.info("Stab: %s", damage)
+        damage = floored_multiply(damage, type_multiplier)
+        logger.info("Type matchup: %s", damage)
+        # BURN
+        damage = pokerounded_multiply(damage, other_modifications)
+        logger.info("Other: %s", damage)
+        # ZMOVE
+        # TERA SHIELD
+        damage = pokerounded_multiply(damage, nhits)
+        logger.info("Nhits: %s", damage)
+        return damage
+
+    damage = final_formula()
+    if attacker.has_ability(Ability.ParentalBond) and not move.has_flag(
+        MoveFlag.NoParentalBond
+    ):
+        second_hit = final_formula(True)
+        damage = [damage[i] + second_hit[i] for i in range(len(damage))]
     return damage
