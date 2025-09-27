@@ -14,7 +14,7 @@ class BoostableStat(Enum):
     SpecialDefence = "spd"
     Speed = "spe"
     Accuracy = "accuracy"
-    Evasopn = "evasion"
+    Evasion = "evasion"
 
 
 class Stat(Enum):

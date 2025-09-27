@@ -1,12 +1,16 @@
 import logging
 import math
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 from pokemon_damage_calculator.data import get_nature, get_species
 from pokemon_damage_calculator.model.enums import Ability, Stat, Status
+from pokemon_damage_calculator.model.logic import stat_modifications
 from pokemon_damage_calculator.model.models import Species
 from pokemon_damage_calculator.model.natures import Nature, NatureModel
 from ..model.models import StatDistribution
+
+if TYPE_CHECKING:
+    from pokemon_damage_calculator.calc.calcbuilder import GameState
 
 logger = logging.getLogger()
 
@@ -19,6 +23,7 @@ class Pokemon:
         evs=StatDistribution.flat(),
         ivs=StatDistribution.flat(31),
         nature=get_nature("hardy"),
+        item=None,
         level=50,
     ) -> None:
         self.species = species
@@ -28,8 +33,11 @@ class Pokemon:
         self.ivs = ivs
         self.level = level
         self.status: Optional[Status] = None
+        # TODO handle this None
+        self.current_hp = self.stat(Stat.HP, None)  # type: ignore
+        self.item = item
 
-    def stat(self, stat: Stat) -> int:
+    def stat(self, stat: Stat, game_state: "GameState") -> int:
         if self.nature.plus == stat:
             nature = 1.1
         elif self.nature.minus == stat:
@@ -53,6 +61,7 @@ class Pokemon:
                 + level
                 + 10
             )
+        result = stat_modifications(self, game_state, stat, result)
         logger.info(
             "Result %s, Species %s, Stat %s, nature %s, base %s, ev %s, iv %s, level %s",
             result,
@@ -83,6 +92,7 @@ class PokemonBuilder:
         self._ivs = StatDistribution.flat(31)
         self._nature = get_nature(Nature.HARDY)
         self._ability = Ability.NoAbility
+        self._item = None
         self._level = 50
 
     def ev(self, stat: Stat, ev: int) -> "PokemonBuilder":
@@ -123,6 +133,7 @@ class PokemonBuilder:
             self._evs,
             self._ivs,
             self._nature,
+            self._item,
             self._level,
         )
 

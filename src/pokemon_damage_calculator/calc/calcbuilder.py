@@ -1,3 +1,4 @@
+from typing import Optional
 from pokemon_damage_calculator.calc.damage_calc import damage_calc
 from pokemon_damage_calculator.calc.pokemon import (
     IntoPokemon,
@@ -22,28 +23,29 @@ class Format:
         return GameState(self, attacker, defender)
 
 
-class Field:
-    def __init__(self) -> None:
+class GameState:
+    def __init__(
+        self,
+        format: Format,
+        attacker: Optional[IntoPokemon],
+        defender: Optional[IntoPokemon],
+    ) -> None:
+        queue = SpeedQueue()
+        if attacker:
+            attacker = into_pokemon(attacker)
+            self.attacker = attacker
+            queue.add(attacker)
+        if defender:
+            defender = into_pokemon(defender)
+            self.defender = defender
+            queue.add(defender)
+
+        self.format = format
         self.weather: Weather = Weather.NONE
         self.terrain: Terrain = Terrain.NONE
 
-
-class GameState:
-    def __init__(
-        self, format: Format, attacker: IntoPokemon, defender: IntoPokemon
-    ) -> None:
-        attacker = into_pokemon(attacker)
-        defender = into_pokemon(defender)
-
-        self.field = Field()
-
-        self.format = format
-        self.attacker = attacker
-        self.defender = defender
-
-        queue = SpeedQueue([attacker, defender])
-        while p := queue.next():
-            enters_effects(p, self.field)
+        while p := queue.next(self):
+            enters_effects(p, self)
 
     def switch_attacker(self, attacker: IntoPokemon) -> "GameState":
         self.attacker = into_pokemon(attacker)
@@ -54,6 +56,4 @@ class GameState:
         return self
 
     def calc(self, move: IntoMove) -> list[int]:
-        return damage_calc(
-            self.format, self.field, self.attacker, self.defender, into_move(move)
-        )
+        return damage_calc(self, self.attacker, self.defender, into_move(move))

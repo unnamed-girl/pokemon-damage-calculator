@@ -12,7 +12,7 @@ def test_weather_order():
             PokemonBuilder("electrode").ability(Ability.Drizzle),
             PokemonBuilder("cosmoem").ability(Ability.Drought),
         )
-        .field.weather
+        .weather
         == Weather.SunnyDay
     )
 
@@ -24,7 +24,7 @@ def test_weather_order_2():
             PokemonBuilder("electrode").ability(Ability.Drought),
             PokemonBuilder("cosmoem").ability(Ability.Drizzle),
         )
-        .field.weather
+        .weather
         == Weather.RainDance
     )
 
@@ -36,7 +36,7 @@ def test_weak_after_strong_weather():
             PokemonBuilder("electrode").ability(Ability.DesolateLand),
             PokemonBuilder("cosmoem").ability(Ability.Drizzle),
         )
-        .field.weather
+        .weather
         == Weather.ExtremelyHarshSunlight
     )
 
@@ -48,7 +48,7 @@ def test_strong_after_strong_weather():
             PokemonBuilder("electrode").ability(Ability.DesolateLand),
             PokemonBuilder("cosmoem").ability(Ability.PrimordialSea),
         )
-        .field.weather
+        .weather
         == Weather.HeavyRain
     )
 

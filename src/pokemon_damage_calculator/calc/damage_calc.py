@@ -6,6 +6,11 @@ from pokemon_damage_calculator.calc.base_power_callbacks import (
     heavy_slam,
     low_kick,
 )
+from pokemon_damage_calculator.calc.utils import (
+    floored_multiply,
+    pokemon_round,
+    pokerounded_multiply,
+)
 from pokemon_damage_calculator.model.enums import (
     Ability,
     MoveCategory,
@@ -16,6 +21,7 @@ from pokemon_damage_calculator.model.enums import (
     TypeMatchup,
     UniqueOffensivePokemon,
 )
+from pokemon_damage_calculator.model.logic import damage_calc_attack_stat_modification
 from pokemon_damage_calculator.model.models import Move
 
 from .pokemon import Pokemon
@@ -24,29 +30,14 @@ from ..utils import TYPE_CHART
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .calcbuilder import Format, Field
+    from .calcbuilder import GameState
 
 
 logger = logging.getLogger()
 
 
-def floored_multiply(damage_range: list[int], multiplier: float) -> list[int]:
-    return [math.floor(d * multiplier) for d in damage_range]
-
-
-EPSILON = 0.0001
-
-
-def pokemon_round(n: float) -> int:
-    return round(n - EPSILON)
-
-
-def pokerounded_multiply(damage_range: list[int], multiplier: float) -> list[int]:
-    return [pokemon_round(d * multiplier) for d in damage_range]
-
-
 def damage_calc(
-    format: "Format", field: "Field", attacker: Pokemon, target: Pokemon, move: Move
+    game_state: "GameState", attacker: Pokemon, target: Pokemon, move: Move
 ) -> list[int]:
     if move.category == MoveCategory.Status:
         return [0]
@@ -83,7 +74,8 @@ def damage_calc(
     # Initial values
     target_multiplier = (
         1
-        if move.target
+        if not game_state.format.doubles
+        or move.target
         in [
             Target.Self,
             Target.AdjacentAlly,
@@ -97,8 +89,11 @@ def damage_calc(
         ]
         else 0.75
     )
-    attack = attacker_stat_source.stat(offense_stat)
-    defence = target.stat(defense_stat)
+    attack = attacker_stat_source.stat(offense_stat, game_state)
+    attack = damage_calc_attack_stat_modification(attacker, game_state, move, attack)
+
+    defence = target.stat(defense_stat, game_state)
+
     level = attacker.level
     power = move.basePower
     other_modifications = 1
@@ -309,7 +304,10 @@ def damage_calc(
         elif move.name == "Low Kick":
             power = low_kick(target.species.weightkg)
         elif move.name == "Electro Ball":
-            power = electro_ball(attacker.stat(Stat.Speed), target.stat(Stat.Speed))
+            power = electro_ball(
+                attacker.stat(Stat.Speed, game_state),
+                target.stat(Stat.Speed, game_state),
+            )
         else:
             logger.error("Didn't handle base power callback for %s", move.name)
     for type_, ability, multiplier in [
@@ -321,10 +319,10 @@ def damage_calc(
         ):
             other_modifications *= multiplier
 
-    if field.terrain:
-        other_modifications *= field.terrain.type_multiplier(altered_move_type)
-    if field.weather:
-        weather = field.weather.type_multiplier(altered_move_type)
+    if game_state.terrain:
+        other_modifications *= game_state.terrain.type_multiplier(altered_move_type)
+    if game_state.weather:
+        weather = game_state.weather.type_multiplier(altered_move_type)
     else:
         weather = 1
 
