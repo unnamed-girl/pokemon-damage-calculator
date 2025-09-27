@@ -68,6 +68,9 @@ class Species:
     baseSpecies: Optional[str]
     weightkg: int | float
 
+    def __repr__(self) -> str:
+        return f"<{self.name}>"
+
 
 @dataclass(kw_only=True)  # shuts up pylance, TODO fix this
 @serde
@@ -178,4 +181,4 @@ class Move:
         )
 
     def __repr__(self) -> str:
-        return self.name
+        return f"<{self.name}>"

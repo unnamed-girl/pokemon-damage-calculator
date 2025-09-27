@@ -89,12 +89,20 @@ class PokemonBuilder:
         self._evs[stat] = ev
         return self
 
+    def evs(self, distribution: StatDistribution) -> "PokemonBuilder":
+        self._evs = distribution
+        return self
+
     def ability(self, ability: Ability) -> "PokemonBuilder":
         self._ability = ability
         return self
 
     def iv(self, stat: Stat, iv: int) -> "PokemonBuilder":
         self._ivs[stat] = iv
+        return self
+
+    def ivs(self, distribution: StatDistribution) -> "PokemonBuilder":
+        self._ivs = distribution
         return self
 
     def nature(self, nature: NatureModel | Nature) -> "PokemonBuilder":
@@ -117,3 +125,15 @@ class PokemonBuilder:
             self._nature,
             self._level,
         )
+
+
+type IntoPokemon = Pokemon | PokemonBuilder
+
+
+def into_pokemon(pokemon: IntoPokemon) -> Pokemon:
+    if type(pokemon) is PokemonBuilder:
+        return pokemon.build()
+    elif type(pokemon) is Pokemon:
+        return pokemon
+    else:
+        assert False

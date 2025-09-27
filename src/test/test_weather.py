@@ -1,6 +1,6 @@
 from pokemon_damage_calculator.calc.calcbuilder import Format
 from pokemon_damage_calculator.calc.pokemon import PokemonBuilder
-from pokemon_damage_calculator.model.enums import Ability, Stat, Weather
+from pokemon_damage_calculator.model.enums import Ability, Weather
 from test.testutils import standard_calc
 
 

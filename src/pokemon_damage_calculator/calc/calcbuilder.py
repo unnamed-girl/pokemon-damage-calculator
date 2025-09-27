@@ -1,34 +1,12 @@
 from pokemon_damage_calculator.calc.damage_calc import damage_calc
-from pokemon_damage_calculator.calc.pokemon import Pokemon, PokemonBuilder
+from pokemon_damage_calculator.calc.pokemon import (
+    IntoPokemon,
+    into_pokemon,
+)
 from pokemon_damage_calculator.calc.speed_queue import SpeedQueue
-from pokemon_damage_calculator.data import get_move
+from pokemon_damage_calculator.data import IntoMove, into_move
 from pokemon_damage_calculator.model.enums import Terrain, Weather
 from pokemon_damage_calculator.model.logic import enters_effects
-from pokemon_damage_calculator.model.models import Move
-
-
-type IntoPokemon = Pokemon | PokemonBuilder
-
-
-def into_pokemon(pokemon: IntoPokemon) -> Pokemon:
-    if type(pokemon) is PokemonBuilder:
-        return pokemon.build()
-    elif type(pokemon) is Pokemon:
-        return pokemon
-    else:
-        assert False
-
-
-type IntoMove = Move | str
-
-
-def into_move(move: IntoMove) -> Move:
-    if type(move) is str:
-        return get_move(move)
-    elif type(move) is Move:
-        return move
-    else:
-        assert False
 
 
 class Format:

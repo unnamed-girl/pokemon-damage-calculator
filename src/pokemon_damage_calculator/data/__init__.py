@@ -1,3 +1,5 @@
+from typing import Optional
+from serde import serde
 from serde.json import from_json
 
 from pokemon_damage_calculator.model.models import Move, Species
@@ -14,6 +16,23 @@ with open("data/natures.json") as f:
     _natures = from_json(dict[str, dict[str, NatureModel]], f.read())
 
 
+@serde
+class _Learnset:
+    learnset: Optional[dict[str, list[str]]]
+    eventdata: Optional[dict]
+
+    def __repr__(self) -> str:
+        return repr(self.learnset)
+
+
+with open("data/learnsets.json") as f:
+    _temp = from_json(dict[str, _Learnset], f.read())
+    _learnsets = {
+        pokemon: [_moves[move] for move in _temp[pokemon].learnset or {}]
+        for pokemon in _temp
+    }
+
+
 def get_species(species_name: str) -> Species:
     return _pokedex[clean_name(species_name)]
 
@@ -24,3 +43,33 @@ def get_move(move_name: str) -> Move:
 
 def get_nature(nature_name: str) -> NatureModel:
     return _natures["9"][clean_name(nature_name)]
+
+
+def get_learnset(species: "IntoSpecies") -> list[Move]:
+    species = into_species(species)
+    name = species.baseSpecies or species.name
+    return _learnsets[clean_name(name)]
+
+
+type IntoMove = Move | str
+
+
+def into_move(move: IntoMove) -> Move:
+    if type(move) is str:
+        return get_move(move)
+    elif type(move) is Move:
+        return move
+    else:
+        assert False
+
+
+type IntoSpecies = Species | str
+
+
+def into_species(species: IntoSpecies) -> Species:
+    if type(species) is str:
+        return get_species(species)
+    elif type(species) is Species:
+        return species
+    else:
+        assert False
