@@ -19,9 +19,11 @@ class Format:
     @staticmethod
     def gen9vgc() -> "Format":
         return Format(9, True)
+
     def doubles(self, doubles: bool) -> "Format":
         self._doubles = doubles
         return self
+
     def game(self, attacker: IntoPokemon, defender: IntoPokemon) -> "GameState":
         return GameState(self, attacker, defender)
 

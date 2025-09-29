@@ -148,7 +148,7 @@ def damage_calc(
     match move.multihit:
         case n if isinstance(n, int):
             nhits = n
-        case n if isinstance(n, tuple): # tuple[int, int]
+        case n if isinstance(n, tuple):  # tuple[int, int]
             nhits = n[1]
         case None:
             nhits = 1

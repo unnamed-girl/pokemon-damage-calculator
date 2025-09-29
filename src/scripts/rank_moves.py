@@ -1,13 +1,18 @@
 from dataclasses import dataclass
 from functools import total_ordering
+import logging
 from typing import Callable, Iterable, override
 from pokemon_damage_calculator.calc.calcbuilder import Format, IntoPokemon, into_pokemon
 from pokemon_damage_calculator.calc.pokemon import PokemonBuilder
 from pokemon_damage_calculator.data import (
+    IntoSpecies,
     get_learnset,
+    into_species,
 )
 from pokemon_damage_calculator.model.enums import Ability, Stat
 from pokemon_damage_calculator.model.models import Move, NatureModel, StatDistribution
+
+logging.basicConfig(filename="log.txt", filemode="w")
 
 
 class UniversalNature(NatureModel):
@@ -51,6 +56,7 @@ class MoveRatingList:
 
     def reverse_print(self) -> str:
         return str(MoveRatingList(self.move, list(reversed(self.damage))))
+
     def __eq__(self, value: object) -> bool:
         if not isinstance(value, MoveRating):
             return False
@@ -86,16 +92,15 @@ def matchup(
     return (rate_moves(one, two), rate_moves(two, one))
 
 
-def vary_evs[T](
-    evs: Iterable[StatDistribution], next_func: Callable[[PokemonBuilder], T]
-) -> Callable[[PokemonBuilder], list[T]]:
-    def inner(pokemon: PokemonBuilder) -> list[T]:
-        result: list[T] = []
-        for spread in evs:
-            result.append(next_func(pokemon.evs(spread)))
-        return result
-
-    return inner
+def vary_species[T](
+    specieses: list[IntoSpecies],
+    next_func: Callable[[PokemonBuilder], T],
+) -> dict[str, T]:
+    result: dict[str, T] = {}
+    for species in specieses:
+        species = into_species(species)
+        result[species.name] = next_func(PokemonBuilder(species))
+    return result
 
 
 def vary_ability[T](
@@ -105,19 +110,6 @@ def vary_ability[T](
         result: dict[Ability, T] = {}
         for ability in pokemon._species.abilities.values():
             result[ability] = next_func(pokemon.ability(ability))
-        return result
-
-    return inner
-
-
-def vary_nature[T](
-    natures: Iterable[NatureModel],
-    next_func: Callable[[PokemonBuilder], T],
-) -> Callable[[PokemonBuilder], dict[str, T]]:
-    def inner(pokemon: PokemonBuilder) -> dict[str, T]:
-        result: dict[str, T] = {}
-        for nature in natures:
-            result[nature.name] = next_func(pokemon.nature(nature))
         return result
 
     return inner
@@ -157,23 +149,34 @@ def list_movewise(
 
 if __name__ == "__main__":
     static_pokemon = PokemonBuilder("malamar")
-    matchups = vary_ability(
-        vary(
-            [
-                lambda p: p.evs(StatDistribution.flat(100)),
-                lambda p: p.evs(StatDistribution.flat(252)),
-                lambda p: p.nature(UniversalNature()).evs(StatDistribution.flat(252)),
-            ],
-            into_pokemon,
-        )
-    )(PokemonBuilder("ironvaliant"))
+    matchups = vary_species(
+        ["ironvaliant", "incineroar"],
+        vary_ability(
+            vary(
+                [
+                    lambda p: p.evs(StatDistribution.flat(100)),
+                    lambda p: p.evs(StatDistribution.flat(252)),
+                    lambda p: p.nature(UniversalNature()).evs(
+                        StatDistribution.flat(252)
+                    ),
+                ],
+                into_pokemon,
+            )
+        ),
+    )
 
-    for ability, pokemon in matchups.items():
-        print([p.nature.name for p in pokemon])
-        offence, defence = list_movewise([matchup(static_pokemon, p) for p in pokemon])
-        offence.sort()
-        defence.sort()
+    for species, layer in matchups.items():
+        print(f"{species}:")
+        for ability, pokemon in layer.items():
+            offence, defence = list_movewise(
+                [matchup(static_pokemon, p) for p in pokemon]
+            )
+            offence.sort()
+            defence.sort()
 
-        print(f"{ability}:")
-        print(f"Offence: {', '.join(r.reverse_print() for r in offence[-5:])}")
-        print(f"Defence: {', '.join(str(r) for r in defence[-5:])}")
+            print(f"    {ability}:")
+            print(
+                f"        Offence: {', '.join(r.reverse_print() for r in offence[-5:])}"
+            )
+            print(f"        Defence: {', '.join(str(r) for r in defence[-5:])}")
+        print()
