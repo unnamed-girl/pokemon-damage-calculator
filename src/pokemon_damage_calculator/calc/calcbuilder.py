@@ -2,6 +2,7 @@ from typing import Optional
 from pokemon_damage_calculator.calc.damage_calc import damage_calc
 from pokemon_damage_calculator.calc.pokemon import (
     IntoPokemon,
+    Pokemon,
     into_pokemon,
 )
 from pokemon_damage_calculator.calc.speed_queue import SpeedQueue
@@ -30,15 +31,18 @@ class GameState:
         attacker: Optional[IntoPokemon],
         defender: Optional[IntoPokemon],
     ) -> None:
+        self.pokemon: list[Pokemon] = []
         queue = SpeedQueue()
         if attacker:
             attacker = into_pokemon(attacker)
             self.attacker = attacker
             queue.add(attacker)
+            self.pokemon.append(attacker)
         if defender:
             defender = into_pokemon(defender)
             self.defender = defender
             queue.add(defender)
+            self.pokemon.append(defender)
 
         self.format = format
         self.weather: Weather = Weather.NONE

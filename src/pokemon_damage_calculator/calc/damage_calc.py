@@ -1,11 +1,7 @@
+from dataclasses import dataclass
 import logging
 import math
 
-from pokemon_damage_calculator.calc.base_power_callbacks import (
-    electro_ball,
-    heavy_slam,
-    low_kick,
-)
 from pokemon_damage_calculator.calc.utils import (
     floored_multiply,
     pokemon_round,
@@ -16,16 +12,22 @@ from pokemon_damage_calculator.model.enums import (
     MoveCategory,
     MoveFlag,
     PokemonType,
-    Stat,
+    Status,
     Target,
-    TypeMatchup,
-    UniqueOffensivePokemon,
 )
-from pokemon_damage_calculator.model.logic import damage_calc_attack_stat_modification
+from pokemon_damage_calculator.model.logic import (
+    calc_base_power,
+    calc_effective_attack,
+    calc_effective_defence,
+    calc_effective_power,
+    calc_immunities,
+    calc_move_type,
+    calc_other_multipliers,
+    calc_type_effectiveness,
+)
 from pokemon_damage_calculator.model.models import Move
 
 from .pokemon import Pokemon
-from ..utils import TYPE_CHART
 
 from typing import TYPE_CHECKING
 
@@ -36,19 +38,25 @@ if TYPE_CHECKING:
 logger = logging.getLogger()
 
 
+@dataclass
+class _MoveDetails:
+    base_move: Move
+    type: PokemonType
+    ignores_ability: bool
+    contact: bool
+    crits: bool
+
+
 def damage_calc(
     game_state: "GameState", attacker: Pokemon, target: Pokemon, move: Move
 ) -> list[int]:
+    """
+    Calculations as described in https://web.archive.org/web/20240516021936/https://www.trainertower.com/dawoblefets-damage-dissertation/.
+    That is a gen 7 resource, my research into what is known about gen 9 differences will happen later.
+    """
     if move.category == MoveCategory.Status:
         return [0]
 
-    match move.category:
-        case MoveCategory.Physical:
-            offense_stat, defense_stat = Stat.Attack, Stat.Defence
-        case MoveCategory.Special:
-            offense_stat, defense_stat = Stat.SpecialAttack, Stat.SpecialDefence
-
-    # Overall Properties
     attacker_ignores_abilities = (
         move.ignoreAbility
         or attacker.has_ability(Ability.MoldBreaker)
@@ -59,20 +67,33 @@ def damage_calc(
         Ability.LongReach
     )
 
-    # Overrides
-    match move.overrideOffensivePokemon:
-        case None:
-            attacker_stat_source = attacker
-        case UniqueOffensivePokemon.FoulPlay:
-            attacker_stat_source = target
+    crits = target.ability not in [Ability.BattleArmor, Ability.ShellArmor] and (
+        move.willCrit
+        or move.name in ["Storm Throw", "Frost Breath"]
+        or attacker.ability == Ability.Merciless
+        and target.status in [Status.Poison, Status.Toxic]
+        # TODO Laser Focus or +3 crit chance
+    )
 
-    if move.overrideOffensiveStat:
-        offense_stat = move.overrideOffensiveStat
-    if move.overrideDefensiveStat:
-        defense_stat = move.overrideDefensiveStat
+    move_details = _MoveDetails(
+        move,
+        type=calc_move_type(attacker, target, move, game_state),
+        ignores_ability=attacker_ignores_abilities,
+        contact=make_contact,
+        crits=crits,
+    )
 
-    # Initial values
-    target_multiplier = (
+    base_power = calc_base_power(attacker, target, move, game_state)
+    effective_power = calc_effective_power(
+        attacker, target, move_details, game_state, base_power
+    )
+    effective_attack = calc_effective_attack(attacker, target, move_details, game_state)
+    effective_defence = calc_effective_defence(
+        attacker, target, move_details, game_state
+    )
+    attacker_level: int = attacker.level
+
+    spread_multiplier = (
         1
         if not game_state.format.doubles
         or move.target
@@ -89,255 +110,48 @@ def damage_calc(
         ]
         else 0.75
     )
-    attack = attacker_stat_source.stat(offense_stat, game_state)
-    attack = damage_calc_attack_stat_modification(attacker, game_state, move, attack)
 
-    defence = target.stat(defense_stat, game_state)
+    weather_multiplier = game_state.weather.type_multiplier(move.type)
 
-    level = attacker.level
-    power = move.basePower
-    other_modifications = 1
+    # Exact values for crits are unknown as of gen 8
+    crit_multiplier = 1.5 if move_details.crits else 1.0
 
-    ###  Attacker Abilities
-    ## Type Modification
-    altered_move_type = move.type
-    if altered_move_type == PokemonType.Normal:
-        if attacker.has_ability(Ability.Aerilate):
-            other_modifications *= 1.2
-            altered_move_type = PokemonType.Flying
-        if attacker.has_ability(Ability.Galvanize):
-            other_modifications *= 1.2
-            altered_move_type = PokemonType.Electric
-        if attacker.has_ability(Ability.Pixilate):
-            other_modifications *= 1.2
-            altered_move_type = PokemonType.Fairy
-        if attacker.has_ability(Ability.Refrigerate):
-            other_modifications *= 1.2
-            altered_move_type = PokemonType.Ice
-    if move.has_flag(MoveFlag.Sound):
-        if attacker.has_ability(Ability.LiquidVoice):
-            altered_move_type = PokemonType.Water
-    if attacker.has_ability(Ability.Normalize):
-        name = move.realMove or move.name
-        if not move.isZ:
-            if name not in [
-                "hiddenpower",
-                "weatherball",
-                "naturalgift",
-                "technoblast",
-                "judgment",
-                "multiattack",
-                "terrainpulse",
-            ]:
-                other_modifications *= 1.2
-                altered_move_type = PokemonType.Normal
-
-    type_multiplier = 1
-    for poke_type in target.species.types:
-        multiplier = TYPE_CHART[poke_type].get(altered_move_type, TypeMatchup.Neutral)
-        if not (
-            poke_type == PokemonType.Flying
-            and target.has_ability(Ability.DeltaStream)
-            and multiplier == TypeMatchup.SuperEffective
-        ):
-            type_multiplier *= multiplier
-    ## Stat Modification
-    # TODO Blaze
-    # TODO Overgrow
-    # TODO Swarm
-    # TODO Torrent
-    if altered_move_type == PokemonType.Dragon and attacker.has_ability(
-        Ability.DragonsMaw
-    ):
-        attack *= 1.5
-    if altered_move_type == PokemonType.Rock and attacker.has_ability(
-        Ability.RockyPayload
-    ):
-        attack *= 1.5
-    if altered_move_type == PokemonType.Steel and attacker.has_ability(
-        Ability.Steelworker
-    ):
-        attack *= 1.5
-    if altered_move_type == PokemonType.Electric and attacker.has_ability(
-        Ability.Transistor
-    ):
-        attack *= 1.5
-
-    ## Power Modifications
-    if power <= 60 and attacker.has_ability(Ability.Technician):
-        power *= 1.5
-    if altered_move_type == PokemonType.Water and attacker.has_ability(
-        Ability.WaterBubble
-    ):
-        power *= 2
-    ## Misc Power Modification
-    # TODO Analytic
-    if move.has_flag(MoveFlag.Punch) and attacker.has_ability(Ability.IronFist):
-        other_modifications *= 1.2
-    if move.has_flag(MoveFlag.Pulse) and attacker.has_ability(Ability.MegaLauncher):
-        other_modifications *= 1.5
-    if move.has_flag(MoveFlag.Sound) and attacker.has_ability(Ability.PunkRock):
-        other_modifications *= 1.3
-    if (move.recoil or move.hasCrashDamage) and attacker.has_ability(Ability.Reckless):
-        other_modifications *= 1.2
-    # TODO Rivalry
-    # TODO Sand Force
-    if move.has_flag(MoveFlag.Slicing) and attacker.has_ability(Ability.Sharpness):
-        other_modifications *= 1.5
-    if move.hasSheerForce and attacker.has_ability(Ability.SheerForce):
-        other_modifications *= 5325 / 4096
-    # TODO Stakeout
-    if altered_move_type == PokemonType.Steel and attacker.has_ability(
-        Ability.SteelySpirit
-    ):
-        other_modifications *= 1.5
-    if move.has_flag(MoveFlag.Bite) and attacker.has_ability(Ability.StrongJaw):
-        other_modifications *= 1.5
-    # TODO Supreme Overlord
-    if make_contact and attacker.has_ability(Ability.ToughClaws):
-        other_modifications *= 5325 / 4096
-    # TODO Toxic Boost
-
-    ### Ally Abilities
-    # TODO Battery
-    # TODO Power Spot
-    # TODO Steely Spirit
-    # TODO Flower Gift
-    # TODO Minus
-
-    ## Get Stat Ability
-    # TODO Chlorophyll
-    # TODO Flower Gift
-    # TODO Fur Coat
-    # TODO Gorilla Tactics
-    # TODO Grass Pelt
-    # TODO Guts
-    # TODO Hadron Engine
-    # TODO Huge Power
-    # TODO Hustle
-    # TODO Marvel Scale
-    # TODO Orichalcum Pulse
-    # TODO Plus
-    # TODO Protosynthesis
-    # TODO Pure Power
-    # TODO Quark Drive
-    # TODO Quick Feet
-    # TODO Sand Rush
-    # TODO Slush Rush
-    # TODO Solar Power
-    # TODO Surge Surfer
-    # TODO Swift Swim
-    # TODO Unburden
-
-    ### N/A Abilities
-    # Battle Bond
-
-    ### Defender Abilities
-    if not attacker_ignores_abilities:
-        flag_immunities = [
-            (Ability.WindRider, MoveFlag.Wind),
-            (Ability.Bulletproof, MoveFlag.Bullet),
-            (Ability.Soundproof, MoveFlag.Sound),
-        ]
-        for ability, flag in flag_immunities:
-            if move.has_flag(flag) and target.has_ability(ability):
-                other_modifications = 0
-        type_immunities = [
-            (Ability.EarthEater, PokemonType.Ground),
-            (Ability.FlashFire, PokemonType.Fire),
-            (Ability.DrySkin, PokemonType.Water),
-            (Ability.Levitate, PokemonType.Ground),
-            (Ability.LightningRod, PokemonType.Electric),
-            (Ability.MotorDrive, PokemonType.Electric),
-            (Ability.SapSipper, PokemonType.Grass),
-            (Ability.StormDrain, PokemonType.Water),
-            (Ability.VoltAbsorb, PokemonType.Electric),
-            (Ability.WaterAbsorb, PokemonType.Water),
-            (Ability.WellBakedBody, PokemonType.Fire),
-        ]
-        for ability, type_ in type_immunities:
-            if altered_move_type == type_ and target.has_ability(ability):
-                type_multiplier = 0
-
-        # TODO Disguise
-        if altered_move_type == PokemonType.Fire and target.has_ability(
-            Ability.DrySkin
-        ):
-            other_modifications *= 1.25
-        if altered_move_type == PokemonType.Fire and target.has_ability(Ability.Fluffy):
-            other_modifications *= 2
-        if make_contact and target.has_ability(Ability.Fluffy):
-            other_modifications *= 0.5
-        if altered_move_type == PokemonType.Fire and target.has_ability(
-            Ability.Heatproof
-        ):
-            attack *= 0.5
-        # TODO Multiscale
-        # TODO Shadow Shield (NOT IGNORABLE)
-        if move.has_flag(MoveFlag.Sound) and target.has_ability(Ability.PunkRock):
-            other_modifications *= 0.5
-        if altered_move_type == PokemonType.Ghost and target.has_ability(
-            Ability.PurifyingSalt
-        ):
-            attack *= 0.5
-        if altered_move_type in [
-            PokemonType.Ice,
-            PokemonType.Fire,
-        ] and target.has_ability(Ability.ThickFat):
-            attack *= 0.5
-        if altered_move_type == PokemonType.Fire and target.has_ability(
-            Ability.WaterBubble
-        ):
-            other_modifications *= 0.5
-        if move.category == MoveCategory.Special and target.has_ability(
-            Ability.IceScales
-        ):
-            other_modifications *= 0.5
-
-        if target.has_ability(Ability.WonderGuard) and not type_multiplier > 1.0:
-            type_multiplier = 0
-
-    # Unique mods
-    if move.basePowerCallback:
-        if move.name in ["Heavy Slam", "Heat Crash"]:
-            power = heavy_slam(attacker.species.weightkg, target.species.weightkg)
-        elif move.name == "Low Kick":
-            power = low_kick(target.species.weightkg)
-        elif move.name == "Electro Ball":
-            power = electro_ball(
-                attacker.stat(Stat.Speed, game_state),
-                target.stat(Stat.Speed, game_state),
-            )
-        else:
-            logger.error("Didn't handle base power callback for %s", move.name)
-    for type_, ability, multiplier in [
-        (PokemonType.Fairy, Ability.FairyAura, 1.33),
-        (PokemonType.Dark, Ability.DarkAura, 1.33),
-    ]:
-        if altered_move_type == type_ and (
-            attacker.has_ability(ability) or target.has_ability(ability)
-        ):
-            other_modifications *= multiplier
-
-    if game_state.terrain:
-        other_modifications *= game_state.terrain.type_multiplier(altered_move_type)
-    if game_state.weather:
-        weather = game_state.weather.type_multiplier(altered_move_type)
+    if move_details.type in attacker.species.types:
+        stab_multiplier = 2 if attacker.has_ability(Ability.Adaptability) else 1.5
     else:
-        weather = 1
+        stab_multiplier = 1.0
 
-    if attacker.has_ability(Ability.DauntlessShield) and move.name == "Body Press":
-        attack *= 1.5
-    if offense_stat == Stat.Attack and attacker.has_ability(Ability.IntrepidSword):
-        attack *= 1.5
-    if defense_stat == Stat.Defence and target.has_ability(Ability.DauntlessShield):
-        defence *= 1.5
-    if offense_stat == Stat.SpecialAttack and attacker.has_ability(
-        Ability.HadronEngine
-    ):
-        attack *= 1.33
-    if offense_stat == Stat.Attack and attacker.has_ability(Ability.OrichalcumPulse):
-        attack *= 1.33
+    type_effectiveness = calc_type_effectiveness(
+        attacker, target, move_details, game_state
+    )
+
+    burn_multiplier = (
+        0.5
+        if (
+            attacker.status == Status.Burn
+            and move.category == MoveCategory.Physical
+            and not attacker.ability == Ability.Guts
+            and move.name != "Facade"
+        )
+        else 1.0
+    )
+
+    other_multiplier = calc_other_multipliers(
+        attacker, target, move_details, game_state
+    )
+
+    # TODO Z-move ignores protect
+
+    if calc_immunities(attacker, target, move_details, game_state, type_effectiveness):
+        return [0 for _ in range(16)]
+
+    # TODO following are etbs
+    # if attacker.has_ability(Ability.DauntlessShield) and move.name == "Body Press":
+    #     attack = math.floor(attack * 1.5)
+    # if offense_stat == Stat.Attack and attacker.has_ability(Ability.IntrepidSword):
+    #     attack = math.floor(attack * 1.5)
+    # if defense_stat == Stat.Defence and target.has_ability(Ability.DauntlessShield):
+    #     defence = math.floor(attack * 1.5)
 
     match move.multihit:
         case n if type(n) is int:
@@ -348,63 +162,83 @@ def damage_calc(
             nhits = 1
         case _:
             assert False
-
-    if altered_move_type in attacker.species.types:
-        stab = 2 if attacker.has_ability(Ability.Adaptability) else 1.5
-    else:
-        stab = 1.0
-
-    ### Type Effectiveness
-    # TODO Scrappy
-    # TODO Filter
-    # TODO Prism Armor (NOT IGNORABLE)
-    # TODO Friend Guard
-    # TODO Solid Rock
-    # TODO Wonder GUard
-
     logger.info(
-        "Level %s, power %s, attack %s, defence %s", level, power, attack, defence
+        """
+        Attacker Level %s
+        Effective Power %s
+        Effective Attack %s
+        Effective Defence %s
+        Spread Multiplier %s
+        weather_multiplier %s
+        crit_multiplier %s
+        type_effectiveness %s
+        stab_multiplier %s
+        burn_multiplier %s
+        other_multiplier %s
+        nhits %s
+        """,
+        attacker_level,
+        effective_power,
+        effective_attack,
+        effective_defence,
+        spread_multiplier,
+        weather_multiplier,
+        crit_multiplier,
+        type_effectiveness,
+        stab_multiplier,
+        burn_multiplier,
+        other_multiplier,
+        nhits,
     )
 
-    def final_formula(parental_bond=False):
+    def final_formula(parental_bond: bool):
         damage = math.floor(
-            math.floor(math.floor(level * 2.0 / 5.0 + 2.0) * power * attack / defence)
+            math.floor(
+                math.floor(attacker_level * 2.0 / 5.0 + 2.0)
+                * effective_power
+                * effective_attack
+                / effective_defence
+            )
             / 50.0
             + 2.0
-        )  # From showdown, diverges from bulbapedia
+        )  # From showdown, rounding diverges from bulbapedia
         logger.info("Base damage: %s", damage)
 
-        damage = pokemon_round(damage * target_multiplier)
+        damage = pokemon_round(damage * spread_multiplier)
+
         if parental_bond:
             damage = pokemon_round(damage * 0.25)
-            logger.info("Parental bond second hit: %s", damage)
-        damage = pokemon_round(damage * weather)
+
+        damage = pokemon_round(damage * weather_multiplier)
+
         # Glaive Rush
-        if move.willCrit:
-            damage = math.floor(damage * 1.5)
-            logger.info("Crit: %s", damage)
-        random = range(85, 101)
-        damage = [math.floor(damage * r / 100) for r in random]
-        logger.info("Range: %s", damage)
-        damage = floored_multiply(
-            damage, stab
-        )  # From showdown, diverges from bulbapedia
-        logger.info("Stab: %s", damage)
-        damage = floored_multiply(damage, type_multiplier)
-        logger.info("Type matchup: %s", damage)
-        # BURN
-        damage = pokerounded_multiply(damage, other_modifications)
-        logger.info("Other: %s", damage)
-        # ZMOVE
-        # TERA SHIELD
+
+        damage = pokemon_round(damage * crit_multiplier)
+
+        damage = [math.floor(damage * r / 100) for r in range(85, 101)]
+
+        damage = pokerounded_multiply(damage, stab_multiplier)
+
+        damage = floored_multiply(damage, type_effectiveness)
+
+        damage = pokerounded_multiply(damage, burn_multiplier)
+
+        damage = pokerounded_multiply(damage, other_multiplier)
+
+        # ZMOVE into prrotect
+        # TERA SHIELD?
+
         damage = pokerounded_multiply(damage, nhits)
-        logger.info("Nhits: %s", damage)
+
+        damage = [max(1, d) for d in damage]
+        damage = [d % 65536 for d in damage]
         return damage
 
-    damage = final_formula()
+    damage = final_formula(False)
     if attacker.has_ability(Ability.ParentalBond) and not move.has_flag(
         MoveFlag.NoParentalBond
     ):
         second_hit = final_formula(True)
         damage = [damage[i] + second_hit[i] for i in range(len(damage))]
+    logger.info("Damage: %s", damage)
     return damage

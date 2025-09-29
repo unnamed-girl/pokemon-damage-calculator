@@ -3,7 +3,7 @@ import math
 from typing import Optional, TYPE_CHECKING
 
 from pokemon_damage_calculator.data import get_nature, get_species
-from pokemon_damage_calculator.model.enums import Ability, Stat, Status
+from pokemon_damage_calculator.model.enums import Ability, PokemonType, Stat, Status
 from pokemon_damage_calculator.model.logic import stat_modifications
 from pokemon_damage_calculator.model.models import Species
 from pokemon_damage_calculator.model.natures import Nature, NatureModel
@@ -77,6 +77,22 @@ class Pokemon:
 
     def has_ability(self, ability: Ability) -> bool:
         return self.ability == ability
+
+    def get_types(self) -> list[PokemonType]:
+        return self.species.types
+
+    def is_grounded(self, ability_ignored: bool) -> bool:
+        if PokemonType.Flying in self.get_types() or (
+            not ability_ignored and self.ability == Ability.Levitate
+        ):
+            return False
+        # TODO Air Balloon
+        # TODO Magnet Rise and Telekinesis
+        # TODO Iron Ball
+        # TODO Ingrain, Smack Down, Thousand Arrows
+        # TODO Gravity
+        # TODO Roost
+        return True
 
 
 class PokemonBuilder:

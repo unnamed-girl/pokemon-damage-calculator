@@ -587,16 +587,6 @@ class Terrain(Enum):
     Grassy = "grassyterrain"
     Electric = "electricterrain"
 
-    def type_multiplier(self, type_: PokemonType) -> float:
-        match self:
-            case Terrain.Psychic if type_ == PokemonType.Psychic:
-                return 1.3
-            case Terrain.Electric if type_ == PokemonType.Electric:
-                return 1.3
-            case Terrain.Grassy if type_ == PokemonType.Grass:
-                return 1.3
-        return 1.0
-
 
 class MoveSelfDestructs(Enum):
     Always = "always"
