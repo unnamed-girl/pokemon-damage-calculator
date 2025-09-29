@@ -1,14 +1,4 @@
 from enum import Enum
-from serde import serde
-
-from pokemon_damage_calculator.model.enums import Stat
-
-
-@serde(deny_unknown_fields=True)
-class NatureModel:
-    name: str
-    plus: Stat | None
-    minus: Stat | None
 
 
 class Nature(str, Enum):

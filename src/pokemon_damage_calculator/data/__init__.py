@@ -3,7 +3,7 @@ from serde import serde
 from serde.json import from_json
 
 from pokemon_damage_calculator.model.models import Move, Species
-from pokemon_damage_calculator.model.natures import NatureModel
+from pokemon_damage_calculator.model.models import NatureModel
 from pokemon_damage_calculator.utils import clean_name
 
 with open("data/pokedex.json") as f:
@@ -55,21 +55,17 @@ type IntoMove = Move | str
 
 
 def into_move(move: IntoMove) -> Move:
-    if type(move) is str:
+    if isinstance(move, str):
         return get_move(move)
-    elif type(move) is Move:
+    elif isinstance(move, Move):
         return move
-    else:
-        assert False
 
 
 type IntoSpecies = Species | str
 
 
 def into_species(species: IntoSpecies) -> Species:
-    if type(species) is str:
+    if isinstance(species, str):
         return get_species(species)
-    elif type(species) is Species:
+    elif isinstance(species, Species):
         return species
-    else:
-        assert False

@@ -95,7 +95,7 @@ def damage_calc(
 
     spread_multiplier = (
         1
-        if not game_state.format.doubles
+        if not game_state.format._doubles
         or move.target
         in [
             Target.Self,
@@ -146,9 +146,9 @@ def damage_calc(
         return [0 for _ in range(16)]
 
     match move.multihit:
-        case n if type(n) is int:
+        case n if isinstance(n, int):
             nhits = n
-        case n if type(n) is tuple[int, int]:
+        case n if isinstance(n, tuple): # tuple[int, int]
             nhits = n[1]
         case None:
             nhits = 1

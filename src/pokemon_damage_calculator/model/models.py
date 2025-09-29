@@ -165,7 +165,7 @@ class Move:
         for flag in [MoveFlag.Recharge, MoveFlag.Charge, MoveFlag.FutureMove]:
             if flag in self.flags:
                 return False
-        if type(self.accuracy) is int:
+        if isinstance(self.accuracy, int):
             if self.accuracy <= 50:
                 return False
         return True
@@ -182,3 +182,16 @@ class Move:
 
     def __repr__(self) -> str:
         return f"<{self.name}>"
+
+
+@serde(deny_unknown_fields=True)
+class NatureModel:
+    name: str
+    _plus: Stat | None = field(rename="plus")
+    _minus: Stat | None = field(rename="minus")
+
+    def increases(self, stat: Stat) -> bool:
+        return stat == self._plus
+
+    def decreases(self, stat: Stat) -> bool:
+        return stat == self._minus

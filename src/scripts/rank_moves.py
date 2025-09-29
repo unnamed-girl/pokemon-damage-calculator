@@ -1,16 +1,26 @@
 from dataclasses import dataclass
 from functools import total_ordering
-from typing import Callable, Iterable
+from typing import Callable, Iterable, override
 from pokemon_damage_calculator.calc.calcbuilder import Format, IntoPokemon, into_pokemon
-from pokemon_damage_calculator.calc.pokemon import Pokemon, PokemonBuilder
+from pokemon_damage_calculator.calc.pokemon import PokemonBuilder
 from pokemon_damage_calculator.data import (
-    IntoSpecies,
     get_learnset,
-    get_species,
-    into_species,
 )
 from pokemon_damage_calculator.model.enums import Ability, Stat
-from pokemon_damage_calculator.model.models import Move, StatDistribution
+from pokemon_damage_calculator.model.models import Move, NatureModel, StatDistribution
+
+
+class UniversalNature(NatureModel):
+    def __init__(self):
+        super().__init__("Universal", None, None)
+
+    @override
+    def increases(self, stat: Stat) -> bool:
+        return True
+
+    @override
+    def decreases(self, stat: Stat) -> bool:
+        return False
 
 
 @dataclass
@@ -31,13 +41,16 @@ class MoveRating:
 
     def __repr__(self) -> str:
         return f"{self.move}: {self.damage[0]}-{self.damage[-1]}"
-    
+
+
 @dataclass
 @total_ordering
 class MoveRatingList:
     move: Move
     damage: list[list[int]]
 
+    def reverse_print(self) -> str:
+        return str(MoveRatingList(self.move, list(reversed(self.damage))))
     def __eq__(self, value: object) -> bool:
         if not isinstance(value, MoveRating):
             return False
@@ -55,7 +68,6 @@ class MoveRatingList:
         return f"{self.move}: {ranges}"
 
 
-
 def rate_moves(attacker: IntoPokemon, defender: IntoPokemon) -> list[MoveRating]:
     attacker = into_pokemon(attacker)
     defender = into_pokemon(defender)
@@ -67,6 +79,13 @@ def rate_moves(attacker: IntoPokemon, defender: IntoPokemon) -> list[MoveRating]
 
     return ratings
 
+
+def matchup(
+    one: IntoPokemon, two: IntoPokemon
+) -> tuple[list[MoveRating], list[MoveRating]]:
+    return (rate_moves(one, two), rate_moves(two, one))
+
+
 def vary_evs[T](
     evs: Iterable[StatDistribution], next_func: Callable[[PokemonBuilder], T]
 ) -> Callable[[PokemonBuilder], list[T]]:
@@ -75,6 +94,7 @@ def vary_evs[T](
         for spread in evs:
             result.append(next_func(pokemon.evs(spread)))
         return result
+
     return inner
 
 
@@ -90,38 +110,70 @@ def vary_ability[T](
     return inner
 
 
-def constant_pokemon(
-    my_pokemon: IntoPokemon,
-) -> Callable[[PokemonBuilder], tuple[list[MoveRating], list[MoveRating]]]:
-    def inner(pokemon: PokemonBuilder) -> tuple[list[MoveRating], list[MoveRating]]:
-        return (rate_moves(my_pokemon, pokemon), rate_moves(pokemon, my_pokemon))
+def vary_nature[T](
+    natures: Iterable[NatureModel],
+    next_func: Callable[[PokemonBuilder], T],
+) -> Callable[[PokemonBuilder], dict[str, T]]:
+    def inner(pokemon: PokemonBuilder) -> dict[str, T]:
+        result: dict[str, T] = {}
+        for nature in natures:
+            result[nature.name] = next_func(pokemon.nature(nature))
+        return result
 
     return inner
 
-def list_movewise(spreadwise: list[tuple[list[MoveRating], list[MoveRating]]]) -> tuple[list[MoveRatingList], list[MoveRatingList]]:
+
+def vary[T](
+    variable: Iterable[Callable[[PokemonBuilder], PokemonBuilder]],
+    next_func: Callable[[PokemonBuilder], T],
+) -> Callable[[PokemonBuilder], list[T]]:
+    def inner(pokemon: PokemonBuilder) -> list[T]:
+        result: list[T] = []
+        for v in variable:
+            result.append(next_func(v(pokemon)))
+        return result
+
+    return inner
+
+
+def list_movewise(
+    spreadwise: list[tuple[list[MoveRating], list[MoveRating]]],
+) -> tuple[list[MoveRatingList], list[MoveRatingList]]:
     movewise_offence: dict[str, MoveRatingList] = {}
     movewise_defence: dict[str, MoveRatingList] = {}
     for offence, defence in spreadwise:
         for rating in offence:
-            movewise_offence.setdefault(rating.move.name, MoveRatingList(rating.move, []))
+            movewise_offence.setdefault(
+                rating.move.name, MoveRatingList(rating.move, [])
+            )
             movewise_offence[rating.move.name].damage.append(rating.damage)
         for rating in defence:
-            movewise_defence.setdefault(rating.move.name,  MoveRatingList(rating.move, []))
+            movewise_defence.setdefault(
+                rating.move.name, MoveRatingList(rating.move, [])
+            )
             movewise_defence[rating.move.name].damage.append(rating.damage)
     return (list(movewise_offence.values()), list(movewise_defence.values()))
 
-if __name__ == "__main__":
-    matchups = vary_ability(
-    vary_evs(
-        [StatDistribution.flat(), StatDistribution.flat(252)],
-        constant_pokemon(PokemonBuilder("malamar")),
-    ))(PokemonBuilder("ironvaliant"))
 
-    for ability, spreads in matchups.items():
-        offence, defence = list_movewise(spreads)
+if __name__ == "__main__":
+    static_pokemon = PokemonBuilder("malamar")
+    matchups = vary_ability(
+        vary(
+            [
+                lambda p: p.evs(StatDistribution.flat(100)),
+                lambda p: p.evs(StatDistribution.flat(252)),
+                lambda p: p.nature(UniversalNature()).evs(StatDistribution.flat(252)),
+            ],
+            into_pokemon,
+        )
+    )(PokemonBuilder("ironvaliant"))
+
+    for ability, pokemon in matchups.items():
+        print([p.nature.name for p in pokemon])
+        offence, defence = list_movewise([matchup(static_pokemon, p) for p in pokemon])
         offence.sort()
         defence.sort()
 
         print(f"{ability}:")
-        print(f"Offence: {", ".join(str(r) for r in offence[-5:])}")
-        print(f"Defence: {", ".join(str(r) for r in defence[-5:])}")
+        print(f"Offence: {', '.join(r.reverse_print() for r in offence[-5:])}")
+        print(f"Defence: {', '.join(str(r) for r in defence[-5:])}")

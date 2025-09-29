@@ -5,8 +5,8 @@ from typing import Optional, TYPE_CHECKING
 from pokemon_damage_calculator.data import get_nature, get_species
 from pokemon_damage_calculator.model.enums import Ability, PokemonType, Stat, Status
 from pokemon_damage_calculator.model.logic import stat_modifications
-from pokemon_damage_calculator.model.models import Species
-from pokemon_damage_calculator.model.natures import Nature, NatureModel
+from pokemon_damage_calculator.model.models import NatureModel, Species
+from pokemon_damage_calculator.model.natures import Nature
 from ..model.models import StatDistribution
 
 if TYPE_CHECKING:
@@ -38,9 +38,9 @@ class Pokemon:
         self.boosts = StatDistribution.flat()
 
     def raw_stat(self, stat: Stat) -> int:
-        if self.nature.plus == stat:
+        if self.nature.increases(stat):
             nature = 1.1
-        elif self.nature.minus == stat:
+        elif self.nature.decreases(stat):
             nature = 0.9
         else:
             nature = 1.0
@@ -101,9 +101,9 @@ class Pokemon:
 
 class PokemonBuilder:
     def __init__(self, species: Species | str) -> None:
-        if type(species) is str:
+        if isinstance(species, str):
             self._species = get_species(species)
-        elif type(species) is Species:
+        elif isinstance(species, Species):
             self._species = species
         else:
             assert False
@@ -136,9 +136,9 @@ class PokemonBuilder:
         return self
 
     def nature(self, nature: NatureModel | Nature) -> "PokemonBuilder":
-        if type(nature) is Nature:
+        if isinstance(nature, Nature):
             self._nature = get_nature(nature)
-        elif type(nature) is NatureModel:
+        elif isinstance(nature, NatureModel):
             self._nature = nature
         return self
 
@@ -162,9 +162,9 @@ type IntoPokemon = Pokemon | PokemonBuilder
 
 
 def into_pokemon(pokemon: IntoPokemon) -> Pokemon:
-    if type(pokemon) is PokemonBuilder:
+    if isinstance(pokemon, PokemonBuilder):
         return pokemon.build()
-    elif type(pokemon) is Pokemon:
+    elif isinstance(pokemon, Pokemon):
         return pokemon
     else:
         assert False

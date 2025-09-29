@@ -13,13 +13,15 @@ from pokemon_damage_calculator.model.logic import enters_effects
 
 class Format:
     def __init__(self, gen: int, doubles: bool) -> None:
-        self.gen = gen
-        self.doubles = doubles
+        self._gen = gen
+        self._doubles = doubles
 
     @staticmethod
     def gen9vgc() -> "Format":
         return Format(9, True)
-
+    def doubles(self, doubles: bool) -> "Format":
+        self._doubles = doubles
+        return self
     def game(self, attacker: IntoPokemon, defender: IntoPokemon) -> "GameState":
         return GameState(self, attacker, defender)
 
