@@ -61,10 +61,12 @@ class Pokemon:
                 + level
                 + 10
             )
+
     def boost_fraction(self, stat: Stat) -> float:
         numerator = max(2, 2 + self.boosts[stat])
         denominator = max(2, 2 - self.boosts[stat])
-        return numerator/denominator
+        return numerator / denominator
+
     def stat(self, stat: Stat, game_state: "GameState") -> int:
         raw_stat = self.raw_stat(stat)
         result = stat_modifications(self, game_state, stat, raw_stat)

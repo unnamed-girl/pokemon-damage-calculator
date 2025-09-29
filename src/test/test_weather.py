@@ -61,10 +61,25 @@ def test_weather_effect():
         "flamethrower",
     ) == [43, 44, 45, 45, 45, 46, 46, 47, 48, 48, 48, 49, 49, 50, 51, 51]
 
+
 def test_snow():
-    game = Format.gen9vgc().game(
-        PokemonBuilder("regice"),
-        PokemonBuilder("regice")
-        )
+    game = Format.gen9vgc().game(PokemonBuilder("regice"), PokemonBuilder("regice"))
     game.weather = Weather.Snow
-    assert game.calc("closecombat") == [36, 36, 38, 38, 38, 38, 40, 40, 40, 40, 40, 42, 42, 42, 42, 44]
+    assert game.calc("closecombat") == [
+        36,
+        36,
+        38,
+        38,
+        38,
+        38,
+        40,
+        40,
+        40,
+        40,
+        40,
+        42,
+        42,
+        42,
+        42,
+        44,
+    ]

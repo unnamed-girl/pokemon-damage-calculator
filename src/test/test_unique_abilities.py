@@ -76,13 +76,19 @@ def test_wonderguard():
 
 def test_dauntless_shield():
     assert standard_calc(
-        Format.gen9vgc(), flareon(), PokemonBuilder("zamazentacrowned").ability(Ability.DauntlessShield), "flareblitz"
+        Format.gen9vgc(),
+        flareon(),
+        PokemonBuilder("zamazentacrowned").ability(Ability.DauntlessShield),
+        "flareblitz",
     ) == [78, 78, 78, 80, 80, 80, 84, 84, 84, 86, 86, 86, 90, 90, 90, 92]
 
 
 def test_dauntless_shield_body_press():
     assert standard_calc(
-        Format.gen9vgc(), PokemonBuilder("zamazentacrowned").ability(Ability.DauntlessShield), flareon(), "bodypress"
+        Format.gen9vgc(),
+        PokemonBuilder("zamazentacrowned").ability(Ability.DauntlessShield),
+        flareon(),
+        "bodypress",
     ) == [
         108,
         109,
