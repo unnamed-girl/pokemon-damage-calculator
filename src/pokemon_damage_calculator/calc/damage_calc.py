@@ -145,14 +145,6 @@ def damage_calc(
     if calc_immunities(attacker, target, move_details, game_state, type_effectiveness):
         return [0 for _ in range(16)]
 
-    # TODO following are etbs
-    # if attacker.has_ability(Ability.DauntlessShield) and move.name == "Body Press":
-    #     attack = math.floor(attack * 1.5)
-    # if offense_stat == Stat.Attack and attacker.has_ability(Ability.IntrepidSword):
-    #     attack = math.floor(attack * 1.5)
-    # if defense_stat == Stat.Defence and target.has_ability(Ability.DauntlessShield):
-    #     defence = math.floor(attack * 1.5)
-
     match move.multihit:
         case n if type(n) is int:
             nhits = n

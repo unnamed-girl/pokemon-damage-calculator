@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 import logging
 import math
-from pydoc import resolve
 from pokemon_damage_calculator.calc.base_power_callbacks import (
     electro_ball,
     heavy_slam,
@@ -60,6 +59,36 @@ def enters_effects(pokemon: "Pokemon", game_state: "GameState"):
             game_state.weather = Weather.SunnyDay
         case Ability.Drizzle if not game_state.weather.difficult_to_override():
             game_state.weather = Weather.RainDance
+
+    # Other
+    match pokemon.ability:
+        case Ability.DauntlessShield:
+            apply_boost(pokemon, game_state, Stat.Defence, 1, False)
+        case Ability.IntrepidSword:
+            apply_boost(pokemon, game_state, Stat.Attack, 1, False)
+        # if attacker.has_ability(Ability.DauntlessShield) and move.name == "Body Press":
+    #     attack = math.floor(attack * 1.5)
+    # if offense_stat == Stat.Attack and attacker.has_ability(Ability.IntrepidSword):
+    #     attack = math.floor(attack * 1.5)
+    # if defense_stat == Stat.Defence and target.has_ability(Ability.DauntlessShield):
+    #     defence = math.floor(attack * 1.5)
+
+
+def apply_boost(
+    pokemon: "Pokemon",
+    game_state: "GameState",
+    stat: Stat,
+    stages: int,
+    hostile_source: bool,
+):
+    if hostile_source and stages < 0:
+        # TODO otherss, e.g. mirror armour
+        match pokemon.ability:
+            case Ability.Defiant:
+                apply_boost(pokemon, game_state, Stat.Attack, 2, False)
+            case Ability.Competitive:
+                apply_boost(pokemon, game_state, Stat.SpecialAttack, 2, False)
+    pokemon.boosts[stat] = min(max(pokemon.boosts[stat] + stages, -6), 6)
 
 
 @dataclass
@@ -462,6 +491,7 @@ def calc_effective_attack(
     logger.info("Attack %s, Effective attack chain: %s", attack, chain)
     return _resolve_chain(attack, chain)
 
+
 class _EffectiveDefenceMults:
     FLOWER_GIFT = _ChainMultiplier(6144, 1)
     ONE_FIVE_ABILITIES = _ChainMultiplier(6144, 2)
@@ -484,9 +514,13 @@ def calc_effective_defence(
         case MoveCategory.Status:
             raise ValueError("This move doesn't have an effective attack")
     defence_stat = move.base_move.overrideDefensiveStat or defense_stat
-    defence: int = target.stat(
-        defence_stat, game_state
-    )
+    defence: int = target.stat(defence_stat, game_state)
+
+    match game_state.weather:
+        case Weather.Sandstorm if PokemonType.Rock in target.get_types():
+            defence = pokemon_round(defence * 6144 / 4096)
+        case Weather.Snow if PokemonType.Ice in target.get_types():
+            defence = pokemon_round(defence * 6144 / 4096)
 
     # TODO boosts (unaware, chip away, sacred sword)
 
@@ -497,7 +531,12 @@ def calc_effective_defence(
         # TODO Flower Gift
         case Ability.FurCoat if defence_stat == Stat.Defence:
             chain.append(_EffectiveDefenceMults.FUR_COAT)
-    
+        case Ability.GrassPelt if (
+            game_state.terrain == Terrain.Grassy and defence_stat == Stat.Defence
+        ):
+            chain.append(_EffectiveDefenceMults.ONE_FIVE_ABILITIES)
+        case Ability.MarvelScale if attacker.status is not None:
+            chain.append(_EffectiveDefenceMults.ONE_FIVE_ABILITIES)
     # TODO items
 
     return defence
@@ -627,11 +666,6 @@ def stat_modifications(
         ):
             multiplier *= 2
         # TODO Flower Gift
-        case Ability.GrassPelt if (
-            stat == Stat.Defence and game_state.terrain == Terrain.Grassy
-        ):
-            # TODO handle confusion
-            multiplier *= 1.5
         # TODO minus
         # TODO plus
         case Ability.SurgeSurfer if (

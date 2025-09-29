@@ -72,3 +72,32 @@ def test_wonderguard():
         (PokemonBuilder("shedinja").ability(Ability.WonderGuard)),
         "waterfall",
     ) == [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+
+
+def test_dauntless_shield():
+    assert standard_calc(
+        Format.gen9vgc(), flareon(), PokemonBuilder("zamazentacrowned").ability(Ability.DauntlessShield), "flareblitz"
+    ) == [78, 78, 78, 80, 80, 80, 84, 84, 84, 86, 86, 86, 90, 90, 90, 92]
+
+
+def test_dauntless_shield_body_press():
+    assert standard_calc(
+        Format.gen9vgc(), PokemonBuilder("zamazentacrowned").ability(Ability.DauntlessShield), flareon(), "bodypress"
+    ) == [
+        108,
+        109,
+        109,
+        111,
+        112,
+        114,
+        115,
+        117,
+        118,
+        118,
+        120,
+        121,
+        123,
+        124,
+        126,
+        127,
+    ]

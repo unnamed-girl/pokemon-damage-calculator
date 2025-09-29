@@ -33,11 +33,11 @@ class Pokemon:
         self.ivs = ivs
         self.level = level
         self.status: Optional[Status] = None
-        # TODO handle this None
-        self.current_hp = self.stat(Stat.HP, None)  # type: ignore
+        self.current_hp = self.raw_stat(Stat.HP)
         self.item = item
+        self.boosts = StatDistribution.flat()
 
-    def stat(self, stat: Stat, game_state: "GameState") -> int:
+    def raw_stat(self, stat: Stat) -> int:
         if self.nature.plus == stat:
             nature = 1.1
         elif self.nature.minus == stat:
@@ -51,27 +51,29 @@ class Pokemon:
         level = self.level
 
         if stat != Stat.HP:
-            result = math.floor(
+            return math.floor(
                 (math.floor((2 * base + iv + math.floor(ev / 4)) * level / 100) + 5)
                 * nature
             )
         else:
-            result = (
+            return (
                 math.floor((2 * base + iv + math.floor(ev / 4)) * level / 100)
                 + level
                 + 10
             )
-        result = stat_modifications(self, game_state, stat, result)
+    def boost_fraction(self, stat: Stat) -> float:
+        numerator = max(2, 2 + self.boosts[stat])
+        denominator = max(2, 2 - self.boosts[stat])
+        return numerator/denominator
+    def stat(self, stat: Stat, game_state: "GameState") -> int:
+        raw_stat = self.raw_stat(stat)
+        result = stat_modifications(self, game_state, stat, raw_stat)
+        result = math.floor(result * self.boost_fraction(stat))
         logger.info(
-            "Result %s, Species %s, Stat %s, nature %s, base %s, ev %s, iv %s, level %s",
-            result,
+            "Species %s's %s is %s",
             self.species.name,
             stat,
-            nature,
-            base,
-            ev,
-            iv,
-            level,
+            result,
         )
         return result
 
