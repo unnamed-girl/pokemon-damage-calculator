@@ -31,12 +31,12 @@ from pokemon_damage_calculator.model.enums import (
 
 @serde
 class StatDistribution:
-    hp: int
-    atk: int
-    def_: int = field(rename="def")
-    spa: int
-    spd: int
-    spe: int
+    hp: int = 0
+    atk: int = 0
+    def_: int = field(default=0, rename="def")
+    spa: int = 0
+    spd: int = 0
+    spe: int = 0
 
     def __getitem__(self, index: Stat) -> int:
         if index == Stat.Defence:

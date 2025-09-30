@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from functools import total_ordering
+from itertools import chain
 import logging
 from typing import Callable, Iterable, override
 from pokemon_damage_calculator.calc.calcbuilder import Format, IntoPokemon, into_pokemon
@@ -11,6 +12,7 @@ from pokemon_damage_calculator.data import (
 )
 from pokemon_damage_calculator.model.enums import Ability, Stat
 from pokemon_damage_calculator.model.models import Move, NatureModel, StatDistribution
+from pokemon_damage_calculator.model.natures import Nature
 
 logging.basicConfig(filename="log.txt", filemode="w")
 
@@ -74,22 +76,26 @@ class MoveRatingList:
         return f"{self.move}: {ranges}"
 
 
-def rate_moves(attacker: IntoPokemon, defender: IntoPokemon) -> list[MoveRating]:
+def rate_moves(
+    move_filter: Callable[[Move], bool], attacker: IntoPokemon, defender: IntoPokemon
+) -> list[MoveRating]:
     attacker = into_pokemon(attacker)
     defender = into_pokemon(defender)
 
     learnset = get_learnset(attacker.species)
     game = Format.gen9vgc().game(attacker, defender)
 
-    ratings = [MoveRating(move, game.calc(move)) for move in learnset]
+    ratings = [
+        MoveRating(move, game.calc(move)) for move in learnset if move_filter(move)
+    ]
 
     return ratings
 
 
 def matchup(
-    one: IntoPokemon, two: IntoPokemon
+    move_filter: Callable[[Move], bool], one: IntoPokemon, two: IntoPokemon
 ) -> tuple[list[MoveRating], list[MoveRating]]:
-    return (rate_moves(one, two), rate_moves(two, one))
+    return (rate_moves(move_filter, one, two), rate_moves(move_filter, two, one))
 
 
 def vary_species[T](
@@ -104,11 +110,14 @@ def vary_species[T](
 
 
 def vary_ability[T](
-    next_func: Callable[[PokemonBuilder], T],
+    next_func: Callable[[PokemonBuilder], T], and_no_ability: bool = False
 ) -> Callable[[PokemonBuilder], dict[Ability, T]]:
     def inner(pokemon: PokemonBuilder) -> dict[Ability, T]:
         result: dict[Ability, T] = {}
-        for ability in pokemon._species.abilities.values():
+        for ability in chain(
+            and_no_ability and [Ability.NoAbility] or [],
+            pokemon._species.abilities.values(),
+        ):
             result[ability] = next_func(pokemon.ability(ability))
         return result
 
@@ -148,7 +157,11 @@ def list_movewise(
 
 
 if __name__ == "__main__":
-    static_pokemon = PokemonBuilder("malamar")
+    static_pokemon = (
+        PokemonBuilder("malamar")
+        .evs(StatDistribution(spa=252, def_=252))
+        .nature(Nature.ADAMANT)
+    )
     matchups = vary_species(
         ["ironvaliant", "incineroar"],
         vary_ability(
@@ -161,7 +174,8 @@ if __name__ == "__main__":
                     ),
                 ],
                 into_pokemon,
-            )
+            ),
+            and_no_ability = True
         ),
     )
 
@@ -169,14 +183,17 @@ if __name__ == "__main__":
         print(f"{species}:")
         for ability, pokemon in layer.items():
             offence, defence = list_movewise(
-                [matchup(static_pokemon, p) for p in pokemon]
+                [
+                    matchup(lambda move: move.is_normal(), static_pokemon, p)
+                    for p in pokemon
+                ]
             )
             offence.sort()
             defence.sort()
 
-            print(f"    {ability}:")
+            print(f"  {ability}:")
             print(
-                f"        Offence: {', '.join(r.reverse_print() for r in offence[-5:])}"
+                f"    Offence: {', '.join(r.reverse_print() for r in reversed(offence[-5:]))}"
             )
-            print(f"        Defence: {', '.join(str(r) for r in defence[-5:])}")
+            print(f"    Defence: {', '.join(str(r) for r in reversed(defence[-5:]))}")
         print()

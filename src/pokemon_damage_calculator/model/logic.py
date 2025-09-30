@@ -66,12 +66,8 @@ def enters_effects(pokemon: "Pokemon", game_state: "GameState"):
             apply_boost(pokemon, game_state, Stat.Defence, 1, False)
         case Ability.IntrepidSword:
             apply_boost(pokemon, game_state, Stat.Attack, 1, False)
-        # if attacker.has_ability(Ability.DauntlessShield) and move.name == "Body Press":
-    #     attack = math.floor(attack * 1.5)
-    # if offense_stat == Stat.Attack and attacker.has_ability(Ability.IntrepidSword):
-    #     attack = math.floor(attack * 1.5)
-    # if defense_stat == Stat.Defence and target.has_ability(Ability.DauntlessShield):
-    #     defence = math.floor(attack * 1.5)
+        case Ability.Intimidate:
+            [apply_boost(p, game_state, Stat.Attack, -1, True) for p in game_state.get_hostile(pokemon)]
 
 
 def apply_boost(
@@ -81,6 +77,7 @@ def apply_boost(
     stages: int,
     hostile_source: bool,
 ):
+    contrary_multiplier = -1 if hostile_source else 1
     if hostile_source and stages < 0:
         # TODO otherss, e.g. mirror armour
         match pokemon.ability:
@@ -88,7 +85,7 @@ def apply_boost(
                 apply_boost(pokemon, game_state, Stat.Attack, 2, False)
             case Ability.Competitive:
                 apply_boost(pokemon, game_state, Stat.SpecialAttack, 2, False)
-    pokemon.boosts[stat] = min(max(pokemon.boosts[stat] + stages, -6), 6)
+    pokemon.boosts[stat] = min(max(pokemon.boosts[stat] + stages * contrary_multiplier, -6), 6)
 
 
 @dataclass

@@ -54,6 +54,14 @@ class GameState:
 
         while p := queue.next(self):
             enters_effects(p, self)
+    
+    def get_hostile(self, perspective: Pokemon) -> list[Pokemon]:
+        if perspective == self.attacker:
+            return [self.defender]
+        elif perspective == self.defender:
+            return [self.attacker]
+        else:
+            return []
 
     def switch_attacker(self, attacker: IntoPokemon) -> "GameState":
         self.attacker = into_pokemon(attacker)
